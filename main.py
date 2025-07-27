@@ -1,12 +1,14 @@
+# main.py
 import threading
+import time
+import os
 from http.server import SimpleHTTPRequestHandler
 from socketserver import TCPServer
-
 from telegram_bot import start_telegram_bot
 from pocket_bot import start_pocket_bot
 from dashboard import run_dashboard
 
-# Keep-alive dummy server
+# Dummy server to keep Render alive
 def keep_alive():
     port = 8080
     handler = SimpleHTTPRequestHandler
@@ -16,8 +18,6 @@ def keep_alive():
 
 if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
-    threading.Thread(target=start_telegram_bot).start()
-    threading.Thread(target=start_pocket_bot).start()
-    
-    # ✅ Run dashboard in a thread too
-    threading.Thread(target=run_dashboard).start()
+    threading.Thread(target=start_telegram_bot, daemon=True).start()
+    threading.Thread(target=start_pocket_bot, daemon=True).start()
+    run_dashboard()  # 👈 This runs the Streamlit dashboard inline

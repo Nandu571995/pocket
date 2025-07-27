@@ -1,12 +1,12 @@
 import threading
-import time
 from http.server import SimpleHTTPRequestHandler
 from socketserver import TCPServer
 
 from telegram_bot import start_telegram_bot
 from pocket_bot import start_pocket_bot
+from dashboard import run_dashboard
 
-# Dummy HTTP server to prevent Render from sleeping
+# Keep-alive dummy server
 def keep_alive():
     port = 8080
     handler = SimpleHTTPRequestHandler
@@ -14,17 +14,9 @@ def keep_alive():
         print(f"🟢 Dummy server running at http://0.0.0.0:{port}")
         httpd.serve_forever()
 
-# Telegram bot thread
-def run_telegram():
-    start_telegram_bot()
-
-# Pocket Option bot (main loop)
-def run_pocket():
-    start_pocket_bot()
-
-# Run everything
+# Threads for components
 if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
-    threading.Thread(target=run_telegram).start()
-    run_pocket()
-
+    threading.Thread(target=start_telegram_bot).start()
+    threading.Thread(target=start_pocket_bot).start()
+    run_dashboard()

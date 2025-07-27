@@ -1,24 +1,24 @@
-import os
-import asyncio
+from datetime import datetime, timedelta
 from telegram import Bot
-from telegram.ext import ApplicationBuilder, CommandHandler
-from dotenv import load_dotenv
+import asyncio
+import os
 
-load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-async def telegram_polling():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    await asyncio.Event().wait()
-
-def start_telegram_bot():
-    asyncio.run(telegram_polling())
-
 def send_signal(asset, tf, signal):
-    text = f"📢 OTC Signal\nAsset: {asset}\nTF: {tf}\nAction: {signal}"
+    now = datetime.now()
+    start_time = now.strftime("%H:%M")
+    end_time = (now + timedelta(minutes=1)).strftime("%H:%M")
+    
+    signal_emoji = "🔴 RED (SELL)" if signal == "SELL" else "🟢 GREEN (BUY)"
+    
+    message = (
+        f"📢 OTC Signal\n"
+        f"Pair: {asset}\n"
+        f"Time: {start_time} - {end_time}\n"
+        f"Next Candle 1 min: {signal_emoji}"
+    )
+
     bot = Bot(token=BOT_TOKEN)
-    asyncio.run(bot.send_message(chat_id=CHAT_ID, text=text))
+    asyncio.run(bot.send_message(chat_id=CHAT_ID, text=message))

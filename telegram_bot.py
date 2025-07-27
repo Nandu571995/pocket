@@ -1,32 +1,18 @@
-import os
-import asyncio
+# telegram_bot.py
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from dotenv import load_dotenv
+import os
 
-load_dotenv()
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = int(os.getenv("TELEGRAM_CHAT_ID"))
-is_running = {"status": False}
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    is_running["status"] = True
-    await context.bot.send_message(chat_id=CHAT_ID, text="✅ Trading bot started.")
-
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    is_running["status"] = False
-    await context.bot.send_message(chat_id=CHAT_ID, text="⛔ Trading bot stopped.")
+    await update.message.reply_text("✅ Bot is live and ready!")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "🟢 Running" if is_running["status"] else "🔴 Stopped"
-    await context.bot.send_message(chat_id=CHAT_ID, text=f"Bot status: {msg}")
+    await update.message.reply_text("⚙️ Running... signals active!")
 
-async def telegram_polling():
+async def start_telegram_bot():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("status", status))
     await app.run_polling()
-
-def start_telegram_bot():
-    asyncio.run(telegram_polling())

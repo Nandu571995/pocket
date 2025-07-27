@@ -1,7 +1,8 @@
+# render.yaml
 services:
   - type: web
-    name: pocket-option-bot
+    name: pocket-dashboard
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python main.py"
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run dashboard.py --server.port 8080 --server.address 0.0.0.0
     plan: free

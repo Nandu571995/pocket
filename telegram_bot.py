@@ -4,6 +4,7 @@ import os
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
 bot = Bot(token=BOT_TOKEN)
 
 def send_signal(asset, tf, signal):
@@ -24,7 +25,7 @@ def send_signal(asset, tf, signal):
     try:
         bot.send_message(chat_id=CHAT_ID, text=message)
     except Exception as e:
-        print(f"❌ Telegram error: {e}")
+        print(f"❌ Telegram Error: {e}")
 
 def start_telegram_bot():
     print("Telegram bot is embedded into signal system.")

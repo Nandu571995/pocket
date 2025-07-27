@@ -9,18 +9,33 @@ def get_indicators(df):
     df['rsi'] = ta.momentum.rsi(df['close'])
     return df
 
-def check_trade_signal(df):
-    df = get_indicators(df)
+def check_trade_signal(candles):
+    # Ensure input is a DataFrame
+    if not isinstance(candles, pd.DataFrame):
+        df = pd.DataFrame(candles)
+    else:
+        df = candles
 
+    if df.empty or len(df) < 25:
+        return None
+
+    df = get_indicators(df)
     latest = df.iloc[-1]
 
-    # Strategy: EMA crossover + MACD + RSI confirmation
     if (latest['ema_fast'] > latest['ema_slow'] and 
         latest['macd'] > 0 and 
         latest['rsi'] > 55):
-        return "BUY"
+        return {
+            "direction": "BUY",
+            "reason": "EMA fast > slow, MACD > 0, RSI > 55"
+        }
+
     elif (latest['ema_fast'] < latest['ema_slow'] and 
           latest['macd'] < 0 and 
           latest['rsi'] < 45):
-        return "SELL"
+        return {
+            "direction": "SELL",
+            "reason": "EMA fast < slow, MACD < 0, RSI < 45"
+        }
+
     return None

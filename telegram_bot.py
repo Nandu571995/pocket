@@ -1,18 +1,24 @@
-# telegram_bot.py
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
+import asyncio
+from telegram import Bot
+from telegram.ext import ApplicationBuilder, CommandHandler
+from dotenv import load_dotenv
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+load_dotenv()
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Bot is live and ready!")
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⚙️ Running... signals active!")
-
-async def start_telegram_bot():
+async def telegram_polling():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("status", status))
-    await app.run_polling()
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    await asyncio.Event().wait()
+
+def start_telegram_bot():
+    asyncio.run(telegram_polling())
+
+def send_signal(asset, tf, signal):
+    text = f"📢 OTC Signal\nAsset: {asset}\nTF: {tf}\nAction: {signal}"
+    bot = Bot(token=BOT_TOKEN)
+    asyncio.run(bot.send_message(chat_id=CHAT_ID, text=text))

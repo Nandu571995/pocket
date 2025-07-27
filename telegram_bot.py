@@ -22,3 +22,7 @@ def send_signal(asset, tf, signal):
 
     bot = Bot(token=BOT_TOKEN)
     asyncio.run(bot.send_message(chat_id=CHAT_ID, text=message))
+
+# ✅ Dummy function to avoid import error
+def start_telegram_bot():
+    print("Telegram bot is a utility, no need to run separately.")

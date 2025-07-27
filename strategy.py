@@ -1,15 +1,14 @@
 import pandas as pd
 import ta
 
-def default_strategy(df):
-    if df.shape[0] < 20:
-        return None
-    df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=5).ema_indicator()
-    df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=13).ema_indicator()
-    df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
-    latest = df.iloc[-1]
-    if latest['rsi'] < 30 and latest['ema_fast'] > latest['ema_slow']:
+def check_trade_signal(candles):
+    df = pd.DataFrame(candles)
+    df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=5)
+    df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=20)
+    df['macd'] = ta.trend.macd_diff(df['close'])
+
+    if df['ema_fast'].iloc[-1] > df['ema_slow'].iloc[-1] and df['macd'].iloc[-1] > 0:
         return "BUY"
-    elif latest['rsi'] > 70 and latest['ema_fast'] < latest['ema_slow']:
+    elif df['ema_fast'].iloc[-1] < df['ema_slow'].iloc[-1] and df['macd'].iloc[-1] < 0:
         return "SELL"
     return None

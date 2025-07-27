@@ -1,9 +1,10 @@
-# File: pocket_bot.py
 import time
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+import random
+import pandas as pd
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from strategy import check_trade_signal
@@ -35,17 +36,19 @@ def start_pocket_bot():
             for tf in TIMEFRAMES:
                 try:
                     candles = get_candle_data(driver, asset, tf)
-                    signal = check_trade_signal(candles)
+                    df = pd.DataFrame(candles)
+                    signal = check_trade_signal(df)
+
                     if signal:
                         send_signal(asset, tf, signal)
-                        save_signal_result(asset, tf, signal, candles)
+                        save_signal_result(asset, tf, signal, df)
+
                 except Exception as e:
                     logging.error(f"❌ Error for {asset} {tf}: {e}")
         time.sleep(60)
 
 # Simulated candle data (replace with real scraping logic)
 def get_candle_data(driver, asset, timeframe):
-    import random
     candles = []
     for _ in range(100):
         open_price = random.uniform(1.0, 1.1)
@@ -62,17 +65,17 @@ def get_candle_data(driver, asset, timeframe):
     return candles
 
 # Store signal and later track accuracy
-def save_signal_result(asset, tf, signal, candles):
+def save_signal_result(asset, tf, signal, df):
     now = datetime.now()
-    next_candle_open = candles[-1]['close']
-    result_entry = {
+    next_open = df.iloc[-1]['close']
+    entry = {
         "asset": asset,
         "timeframe": tf,
         "signal": signal,
         "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "open": next_candle_open,
+        "open": round(next_open, 5),
         "checked": False,
-        "result": None  # To be filled as True/False
+        "result": None  # To be validated after candle closes
     }
 
     if os.path.exists(SIGNAL_LOG):
@@ -81,7 +84,7 @@ def save_signal_result(asset, tf, signal, candles):
     else:
         data = []
 
-    data.append(result_entry)
+    data.append(entry)
 
     with open(SIGNAL_LOG, "w") as f:
         json.dump(data, f, indent=2)

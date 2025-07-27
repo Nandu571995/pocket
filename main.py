@@ -1,13 +1,13 @@
+import threading
 from telegram_bot import start_telegram_bot
-from pocket_bot import run_signal_engine
-import asyncio
+from pocket_bot import start_pocket_bot
 
-async def main():
-    # Run both the telegram bot and the signal engine concurrently
-    await asyncio.gather(
-        start_telegram_bot(),
-        run_signal_engine()
-    )
+def run_telegram():
+    start_telegram_bot()
+
+def run_pocket():
+    start_pocket_bot()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    threading.Thread(target=run_telegram).start()
+    run_pocket()

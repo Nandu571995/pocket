@@ -14,9 +14,10 @@ def keep_alive():
         print(f"🟢 Dummy server running at http://0.0.0.0:{port}")
         httpd.serve_forever()
 
-# Threads for components
 if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=start_telegram_bot).start()
     threading.Thread(target=start_pocket_bot).start()
-    run_dashboard()
+    
+    # ✅ Run dashboard in a thread too
+    threading.Thread(target=run_dashboard).start()

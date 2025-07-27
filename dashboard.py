@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 
-SIGNAL_LOG = "signals.json"a# File: dashboard.py
+SIGNAL_LOG = "signals.json" # File: dashboard.py
 import streamlit as st
 import pandas as pd
 import json

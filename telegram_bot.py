@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from dotenv import load_dotenv
@@ -20,9 +21,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "🟢 Running" if is_running["status"] else "🔴 Stopped"
     await context.bot.send_message(chat_id=CHAT_ID, text=f"Bot status: {msg}")
 
-def start_telegram_bot():
+async def telegram_polling():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("status", status))
-    app.run_polling()
+    await app.run_polling()
+
+def start_telegram_bot():
+    asyncio.run(telegram_polling())

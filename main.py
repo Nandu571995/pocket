@@ -4,7 +4,7 @@ from socketserver import TCPServer
 
 from telegram_bot import start_telegram_bot
 from pocket_bot import start_pocket_bot
-from dashboard import run_dashboard
+# ❌ DO NOT import or run run_dashboard from dashboard.py on Render
 
 def keep_alive():
     port = 8080
@@ -17,4 +17,4 @@ if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=start_telegram_bot, daemon=True).start()
     threading.Thread(target=start_pocket_bot, daemon=True).start()
-    run_dashboard()  # runs Streamlit in the main thread
+    # ❌ Removed run_dashboard()

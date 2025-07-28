@@ -12,9 +12,15 @@ def load_signals():
 
     try:
         with open(SIGNALS_FILE, "r") as f:
-            return json.load(f)
-    except:
+            data = json.load(f)
+            if isinstance(data, list) and all(isinstance(s, dict) for s in data):
+                return data
+            else:
+                return []
+    except Exception as e:
+        print("Error loading signals.json:", e)
         return []
+
 
 def filter_signals_by_tf(signals, tf):
     return [s for s in signals if s.get("timeframe") == tf]

@@ -5,8 +5,8 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
 
 # Environment variables or fallback
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "1014815784"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") 
 
 bot = Bot(token=TELEGRAM_TOKEN)
 

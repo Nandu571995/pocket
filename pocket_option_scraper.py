@@ -1,48 +1,60 @@
-# pocket_option_scraper.py
-
 import requests
-import random
-import time
-import json
 from datetime import datetime, timedelta
+import pytz
+import time
 
-BASE_URL = "https://api.pocketoption.com"
-
-# Static fallback list of OTC and currency pairs
-FALLBACK_ASSETS = [
-    "EURUSD_otc", "GBPUSD_otc", "USDJPY_otc", "AUDUSD_otc", "NZDUSD_otc",
-    "EURJPY_otc", "GBPJPY_otc", "EURGBP_otc", "USDCHF_otc", "EURUSD",
-    "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP", "USDCHF"
-]
+# Timezone for Pocket Option UTC server
+tz = pytz.UTC
 
 def get_all_assets():
-    """Return a static or scraped list of all tradable assets."""
-    # In production, this should scrape from real-time Pocket Option data.
-    # For now, we use a static list of OTC + Currency pairs
-    return FALLBACK_ASSETS
+    try:
+        response = requests.get("https://pocketoption.com/api/v1/assets/all")
+        assets = response.json().get("data", [])
+        filtered = []
+        for asset in assets:
+            if asset.get("isOTC") or asset.get("category") == "currency":
+                filtered.append(asset["symbol"])
+        return list(set(filtered))
+    except Exception as e:
+        print("Error fetching asset list:", e)
+        return []
 
-def get_candles(asset, interval, limit=5):
-    """
-    Mock candle data generator for demo/testing.
+def fetch_candles(asset, timeframe):
+    try:
+        now = datetime.utcnow().replace(second=0, microsecond=0)
+        if timeframe == "1m":
+            delta = timedelta(minutes=2)
+            interval = 60
+        elif timeframe == "3m":
+            delta = timedelta(minutes=6)
+            interval = 180
+        elif timeframe == "5m":
+            delta = timedelta(minutes=10)
+            interval = 300
+        elif timeframe == "10m":
+            delta = timedelta(minutes=20)
+            interval = 600
+        else:
+            return []
 
-    Replace with real-time candle scraping from Pocket Option WebSocket or API.
-    """
-    now = datetime.utcnow()
-    candles = []
+        end_time = int(now.timestamp())
+        start_time = int((now - delta).timestamp())
 
-    for i in range(limit):
-        open_price = round(random.uniform(1.0, 1.2), 5)
-        close_price = open_price + round(random.uniform(-0.001, 0.001), 5)
-        high_price = max(open_price, close_price) + 0.0005
-        low_price = min(open_price, close_price) - 0.0005
-        candle_time = now - timedelta(minutes=i * interval)
+        url = f"https://pocketoption.com/chart/history/candles/{asset}?from={start_time}&to={end_time}&interval={interval}"
+        res = requests.get(url)
+        candles = res.json().get("data", [])
+        return candles[-2:] if len(candles) >= 2 else []
+    except Exception as e:
+        print(f"Error fetching candles for {asset} ({timeframe}):", e)
+        return []
 
-        candles.append({
-            "time": candle_time.strftime('%Y-%m-%d %H:%M:%S'),
-            "open": open_price,
-            "close": close_price,
-            "high": high_price,
-            "low": low_price,
-        })
-
-    return list(reversed(candles))
+def fetch_candles_for_all_assets(timeframes):
+    all_data = {}
+    assets = get_all_assets()
+    for asset in assets:
+        all_data[asset] = {}
+        for tf in timeframes:
+            candles = fetch_candles(asset, tf)
+            all_data[asset][tf] = candles
+            time.sleep(0.1)  # Avoid hammering server
+    return all_data

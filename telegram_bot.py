@@ -1,31 +1,44 @@
 # telegram_bot.py
 
-import os
-import logging
 from telegram import Bot
+from telegram.ext import Updater
+import threading
+import json
+import time
+from datetime import datetime
 
-# Telegram bot credentials
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1014815784")
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+TELEGRAM_TOKEN = "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
+CHAT_ID = "1014815784"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def send_signal_telegram(signal):
-    try:
-        message = (
-            f"📡 *Signal {signal['timeframe']}m | {signal['asset']}*\n"
-            f"🕒 *Time:* {signal['signal_time']}\n"
-            f"🎯 *Direction:* `{signal['direction'].upper()}`\n"
-            f"📊 *Confidence:* {signal['confidence']}%\n"
-            f"📌 *Reason:* {signal['reason']}\n"
-            f"📅 *Generated at:* {signal['generated_at']}\n"
-            f"#PocketOption #SignalBot"
-        )
-        bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown')
-        logger.info(f"Sent signal to Telegram: {message}")
-    except Exception as e:
-        logger.error(f"Error sending Telegram message: {e}")
+def send_telegram_signal(signal):
+    msg = (
+        f"📊 Signal #{signal['id']}\n"
+        f"📌 Asset: {signal['pair']}\n"
+        f"🕒 Timeframe: {signal['timeframe']} min\n"
+        f"📈 Direction: {signal['direction'].upper()}\n"
+        f"✅ Confidence: {signal['confidence']}%\n"
+        f"📅 Time: {signal['timestamp']}\n"
+        f"🧠 Reason: {signal['reason']}"
+    )
+    bot.send_message(chat_id=CHAT_ID, text=msg)
+
+def monitor_signals():
+    last_sent = set()
+    while True:
+        try:
+            with open("signals.json", "r") as f:
+                data = json.load(f)
+                for signal in data:
+                    signal_id = signal.get("id")
+                    if signal_id not in last_sent:
+                        send_telegram_signal(signal)
+                        last_sent.add(signal_id)
+        except Exception as e:
+            print("❌ Telegram error:", e)
+        time.sleep(10)
+
+def start_telegram_bot():
+    print("✅ Telegram bot is running...")
+    monitor_signals()

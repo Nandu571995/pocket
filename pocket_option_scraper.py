@@ -1,39 +1,48 @@
 # pocket_option_scraper.py
 
 import requests
-import datetime
+import random
+import time
+import json
+from datetime import datetime, timedelta
 
-BASE_URL = "https://api-pocketoption.live/api/v1"
+BASE_URL = "https://api.pocketoption.com"
 
-def get_assets():
-    """Fetch list of available assets (OTC + currency)."""
-    try:
-        response = requests.get(f"{BASE_URL}/assets")
-        response.raise_for_status()
-        assets = response.json()
-        return [a['symbol'] for a in assets if a['type'] in ['otc', 'forex']]
-    except Exception as e:
-        print(f"Asset fetch error: {e}")
-        return []
+# Static fallback list of OTC and currency pairs
+FALLBACK_ASSETS = [
+    "EURUSD_otc", "GBPUSD_otc", "USDJPY_otc", "AUDUSD_otc", "NZDUSD_otc",
+    "EURJPY_otc", "GBPJPY_otc", "EURGBP_otc", "USDCHF_otc", "EURUSD",
+    "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP", "USDCHF"
+]
 
-def get_candles(symbol, timeframe, limit=10):
-    """Fetch recent candles for an asset at given timeframe."""
-    try:
-        url = f"{BASE_URL}/candles?symbol={symbol}&interval={timeframe}&limit={limit}"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        candles = []
-        for c in data:
-            candles.append({
-                "time": datetime.datetime.utcfromtimestamp(c["timestamp"]),
-                "open": c["open"],
-                "close": c["close"],
-                "high": c["high"],
-                "low": c["low"],
-                "volume": c.get("volume", 0)
-            })
-        return candles
-    except Exception as e:
-        print(f"[{symbol} {timeframe}] Candle fetch error: {e}")
-        return []
+def get_all_assets():
+    """Return a static or scraped list of all tradable assets."""
+    # In production, this should scrape from real-time Pocket Option data.
+    # For now, we use a static list of OTC + Currency pairs
+    return FALLBACK_ASSETS
+
+def get_candles(asset, interval, limit=5):
+    """
+    Mock candle data generator for demo/testing.
+
+    Replace with real-time candle scraping from Pocket Option WebSocket or API.
+    """
+    now = datetime.utcnow()
+    candles = []
+
+    for i in range(limit):
+        open_price = round(random.uniform(1.0, 1.2), 5)
+        close_price = open_price + round(random.uniform(-0.001, 0.001), 5)
+        high_price = max(open_price, close_price) + 0.0005
+        low_price = min(open_price, close_price) - 0.0005
+        candle_time = now - timedelta(minutes=i * interval)
+
+        candles.append({
+            "time": candle_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "open": open_price,
+            "close": close_price,
+            "high": high_price,
+            "low": low_price,
+        })
+
+    return list(reversed(candles))

@@ -1,62 +1,79 @@
-# File: pocket_bot.py
+# pocket_bot.py
+
 import time
 import json
+import threading
 from datetime import datetime, timedelta
-from strategy import check_trade_signal
-from telegram_bot import send_signal
-from pocket_option_scraper import get_active_assets, get_candles
+from pocket_option_scraper import get_all_assets, get_candles
+from strategy import analyze_signal
+from telegram_bot import send_signal_alert
 
-TIMEFRAMES = ['1m', '3m', '5m', '10m']
+SIGNALS_FILE = "signals.json"
+TIMEFRAMES = {
+    '1m': 60,
+    '3m': 180,
+    '5m': 300,
+    '10m': 600
+}
 
-def start_pocket_bot():
-    print("📊 Starting real-time Pocket Option bot...")
-    while True:
-        try:
-            assets = get_active_assets()
-            print(f"🔍 Scanning {len(assets)} assets...")
-
-            for asset in assets:
-                for tf in TIMEFRAMES:
-                    candles = get_candles(asset, tf)
-                    if not candles or len(candles) < 5:
-                        continue
-
-                    signal_data = check_trade_signal(candles)
-                    if signal_data:
-                        direction, confidence, reason = signal_data["signal"], signal_data["confidence"], signal_data["reason"]
-
-                        next_start = (datetime.utcnow() + timedelta(seconds=30)).strftime('%H:%M')
-                        next_end = (datetime.utcnow() + timedelta(minutes=int(tf.replace('m', '')))).strftime('%H:%M')
-
-                        send_signal(asset, tf, direction, confidence, reason, next_start, next_end)
-                        log_signal(asset, tf, direction, confidence, reason, next_start, next_end)
-
-            time.sleep(30)
-        except Exception as e:
-            print(f"[ERROR] Bot loop: {e}")
-            time.sleep(10)
-
-def log_signal(asset, tf, direction, confidence, reason, start, end):
+def load_existing_signals():
     try:
-        with open("signals.json", "r") as f:
-            data = json.load(f)
+        with open(SIGNALS_FILE, "r") as f:
+            return json.load(f)
     except:
-        data = {}
+        return []
 
-    if tf not in data:
-        data[tf] = []
+def save_signal(signal):
+    all_signals = load_existing_signals()
+    all_signals.append(signal)
+    with open(SIGNALS_FILE, "w") as f:
+        json.dump(all_signals[-500:], f, indent=2, default=str)  # keep last 500 only
 
-    signal_entry = {
-        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "asset": asset,
-        "direction": direction,
-        "confidence": confidence,
-        "reason": reason,
-        "range": f"{start}-{end}",
-        "result": "PENDING"
+def process_asset(symbol, timeframe, interval):
+    candles = get_candles(symbol, str(interval), limit=100)
+    if candles.empty or len(candles) < 50:
+        return
+
+    signal_data = analyze_signal(candles)
+    if signal_data["signal"] == "NO_SIGNAL":
+        return
+
+    # Set signal timing
+    now = datetime.utcnow()
+    next_candle_time = (now + timedelta(seconds=interval)).replace(second=0, microsecond=0)
+    alert_time = next_candle_time - timedelta(seconds=60)
+
+    # Prepare signal
+    signal = {
+        "pair": symbol,
+        "timeframe": timeframe,
+        "signal": signal_data["signal"],
+        "reason": signal_data["reason"],
+        "confidence": signal_data["confidence"],
+        "timestamp": datetime.utcnow().isoformat(),
+        "for_candle": f"{next_candle_time.strftime('%H:%M')}–{(next_candle_time + timedelta(seconds=interval)).strftime('%H:%M')}"
     }
 
-    data[tf].append(signal_entry)
+    print(f"[{timeframe}] Signal for {symbol}: {signal['signal']} @ {signal['for_candle']} | {signal['confidence']}%")
 
-    with open("signals.json", "w") as f:
-        json.dump(data, f, indent=4)
+    # Save and send signal
+    save_signal(signal)
+    send_signal_alert(signal)
+
+def scan_market():
+    assets = get_all_assets()
+    for symbol in assets:
+        for tf, interval in TIMEFRAMES.items():
+            try:
+                process_asset(symbol, tf, interval)
+            except Exception as e:
+                print(f"Error on {symbol}-{tf}: {e}")
+
+def start_pocket_bot():
+    print("✅ Pocket Option Bot Started.")
+    while True:
+        now = datetime.utcnow()
+        if now.second == 0:
+            threading.Thread(target=scan_market).start()
+            time.sleep(55)
+        time.sleep(1)

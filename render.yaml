@@ -1,17 +1,12 @@
 # render.yaml
+
 services:
   - type: web
     name: pocket-option-signal-bot
     env: python
-    region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       - key: PORT
         value: 10000
-    envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        value: your-bot-token-here
-      - key: TELEGRAM_CHAT_ID
-        value: your-chat-id-here

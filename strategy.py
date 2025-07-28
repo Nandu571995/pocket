@@ -1,57 +1,65 @@
 # strategy.py
-from ta.trend import EMAIndicator, MACD
-from ta.momentum import RSIIndicator
-from ta.volatility import BollingerBands
-import pandas as pd
 
-def check_trade_signal(candles, timeframe):
-    if len(candles) < 50:
-        return None
+import ta
+import numpy as np
 
-    df = pd.DataFrame(candles)
-    df.columns = ["timestamp", "open", "high", "low", "close"]
-    df["close"] = df["close"].astype(float)
-
-    macd = MACD(close=df["close"])
-    ema = EMAIndicator(close=df["close"], window=21)
-    rsi = RSIIndicator(close=df["close"], window=14)
-    bb = BollingerBands(close=df["close"], window=20)
-
-    df["macd"] = macd.macd()
-    df["signal"] = macd.macd_signal()
-    df["ema"] = ema.ema_indicator()
-    df["rsi"] = rsi.rsi()
+def compute_indicators(df):
+    df["ema_9"] = ta.trend.ema_indicator(df["close"], window=9)
+    df["ema_21"] = ta.trend.ema_indicator(df["close"], window=21)
+    df["macd"] = ta.trend.macd_diff(df["close"])
+    df["rsi"] = ta.momentum.rsi(df["close"], window=14)
+    bb = ta.volatility.BollingerBands(df["close"], window=20, window_dev=2)
     df["bb_upper"] = bb.bollinger_hband()
     df["bb_lower"] = bb.bollinger_lband()
+    df["bb_mid"] = bb.bollinger_mavg()
+    return df
 
-    latest = df.iloc[-1]
+def check_trade_signal(df):
+    df = compute_indicators(df)
+    last = df.iloc[-1]
 
-    signal = None
-    confidence = 0
+    signals = []
 
-    if (
-        latest["macd"] > latest["signal"] and
-        latest["close"] > latest["ema"] and
-        latest["rsi"] > 50 and
-        latest["close"] < latest["bb_upper"]
-    ):
-        signal = "GREEN"
-        confidence += 25
-    if (
-        latest["macd"] < latest["signal"] and
-        latest["close"] < latest["ema"] and
-        latest["rsi"] < 50 and
-        latest["close"] > latest["bb_lower"]
-    ):
-        signal = "RED"
-        confidence += 25
+    # EMA Crossover
+    if last["ema_9"] > last["ema_21"]:
+        signals.append("EMA_BULLISH")
+    elif last["ema_9"] < last["ema_21"]:
+        signals.append("EMA_BEARISH")
 
-    if signal:
-        if 55 <= latest["rsi"] <= 70 or 30 <= latest["rsi"] <= 45:
-            confidence += 25
-        if abs(latest["macd"] - latest["signal"]) > 0.1:
-            confidence += 25
+    # MACD
+    if last["macd"] > 0:
+        signals.append("MACD_BULLISH")
+    elif last["macd"] < 0:
+        signals.append("MACD_BEARISH")
 
-        confidence = min(100, confidence)
+    # RSI
+    if last["rsi"] < 30:
+        signals.append("RSI_OVERSOLD")
+    elif last["rsi"] > 70:
+        signals.append("RSI_OVERBOUGHT")
 
-    return {"signal": signal, "confidence": confidence} if signal else None
+    # Bollinger Bands
+    if last["close"] < last["bb_lower"]:
+        signals.append("BB_LOWER_BREAK")
+    elif last["close"] > last["bb_upper"]:
+        signals.append("BB_UPPER_BREAK")
+
+    # Aggregate signal
+    bullish_count = sum(1 for s in signals if "BULLISH" in s or "OVERSOLD" in s or "LOWER" in s)
+    bearish_count = sum(1 for s in signals if "BEARISH" in s or "OVERBOUGHT" in s or "UPPER" in s)
+
+    if bullish_count > bearish_count:
+        direction = "GREEN"
+        confidence = round((bullish_count / (bullish_count + bearish_count)) * 100, 2)
+    elif bearish_count > bullish_count:
+        direction = "RED"
+        confidence = round((bearish_count / (bullish_count + bearish_count)) * 100, 2)
+    else:
+        direction = None
+        confidence = 0.0
+
+    return {
+        "direction": direction,
+        "confidence": confidence,
+        "reasons": signals
+    }

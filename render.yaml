@@ -6,9 +6,9 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        value: 8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA
-      - key: TELEGRAM_CHAT_ID
-        value: 1014815784
-      - key: DASHBOARD_PORT
+  - key: TELEGRAM_TOKEN
+    fromEnvVar: TELEGRAM_TOKEN
+  - key: TELEGRAM_CHAT_ID
+    fromEnvVar: TELEGRAM_CHAT_ID
+   - key: DASHBOARD_PORT
         value: 8501

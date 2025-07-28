@@ -1,28 +1,33 @@
-from telegram import Bot, ParseMode
-from telegram.ext import Updater, CommandHandler
+from telegram import Bot
 import os
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+# Load from environment variables or directly assign
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "1014815784"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def start(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text="🤖 Pocket Option Bot is Active!")
+def send_signal_telegram(signal):
+    """
+    Send a trading signal to Telegram in formatted style.
+    """
+    message = (
+        f"📢 *{signal['timeframe']} Signal Alert!*\n"
+        f"🪙 *Asset:* `{signal['asset']}`\n"
+        f"🎯 *Direction:* {signal['direction']}\n"
+        f"🧠 *Confidence:* {signal['confidence']}%\n"
+        f"📊 *Reason:* {signal['reason']}\n"
+        f"🕒 *Time:* {signal['timestamp']}"
+    )
+    bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
 
-def send_signal_to_telegram(message: str):
-    try:
-        bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
-        print(f"📩 Sent to Telegram: {message}")
-    except Exception as e:
-        print(f"❌ Failed to send Telegram message: {e}")
-
-def start_telegram_bot():
-    try:
-        updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-        dp = updater.dispatcher
-        dp.add_handler(CommandHandler("start", start))
-        print("📡 Telegram Bot started polling...")
-        updater.start_polling()
-    except Exception as e:
-        print(f"❌ Telegram polling error: {e}")
+# Optional: Telegram test
+if __name__ == "__main__":
+    send_signal_telegram({
+        "asset": "BTC/USD",
+        "direction": "BUY",
+        "confidence": 87,
+        "reason": "MACD + EMA",
+        "timestamp": "2025-07-28 21:18",
+        "timeframe": "1m"
+    })

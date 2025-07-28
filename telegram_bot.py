@@ -3,15 +3,12 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
 
 # Config
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "1014815784"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "YOUR_REAL_TOKEN"
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "YOUR_REAL_CHAT_ID"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def send_signal_telegram(signal):
-    """
-    Send a trading signal to Telegram in formatted style.
-    """
     message = (
         f"📢 *{signal['timeframe']} Signal Alert!*\n"
         f"🪙 *Asset:* `{signal['asset']}`\n"
@@ -27,19 +24,18 @@ def start(update: Update, context: CallbackContext):
 
 def run_telegram_bot_background():
     """
-    Starts the Telegram bot in background thread for Render-safe execution.
+    For Render or background thread: polling without idle() to prevent blocking or error
     """
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     print("✅ Telegram bot is listening...")
-    updater.start_polling()  # Do NOT call idle() in threads
+    updater.start_polling()  # No .idle()
 
-# Test locally
+# For manual local testing
 if __name__ == "__main__":
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
-    print("✅ Telegram bot is running locally...")
     updater.start_polling()
     updater.idle()

@@ -1,72 +1,72 @@
 # strategy.py
 
 import pandas as pd
-import numpy as np
 import ta
 
-def preprocess_data(df):
-    df = df.copy()
-    df['close'] = pd.to_numeric(df['close'], errors='coerce')
-    df['open'] = pd.to_numeric(df['open'], errors='coerce')
-    df['high'] = pd.to_numeric(df['high'], errors='coerce')
-    df['low'] = pd.to_numeric(df['low'], errors='coerce')
-    df.dropna(inplace=True)
-    return df
+def analyze_signal(df):
+    try:
+        df = df.copy()
+        df['close'] = df['close'].astype(float)
 
-def calculate_indicators(df):
-    df = df.copy()
-    df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=9)
-    df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=21)
-    macd = ta.trend.MACD(df['close'])
-    df['macd'] = macd.macd()
-    df['macd_signal'] = macd.macd_signal()
-    df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
-    bb = ta.volatility.BollingerBands(df['close'], window=20, window_dev=2)
-    df['bb_upper'] = bb.bollinger_hband()
-    df['bb_lower'] = bb.bollinger_lband()
-    return df
+        # Indicators
+        df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=9).fillna(0)
+        df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=21).fillna(0)
+        macd = ta.trend.MACD(df['close'])
+        df['macd'] = macd.macd().fillna(0)
+        df['macd_signal'] = macd.macd_signal().fillna(0)
+        df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi().fillna(0)
+        bb = ta.volatility.BollingerBands(df['close'], window=20, window_dev=2)
+        df['bb_upper'] = bb.bollinger_hband().fillna(0)
+        df['bb_lower'] = bb.bollinger_lband().fillna(0)
 
-def evaluate_signal(df):
-    df = preprocess_data(df)
-    df = calculate_indicators(df)
+        latest = df.iloc[-1]
 
-    last = df.iloc[-1]
-    second_last = df.iloc[-2]
+        reasons = []
+        confidence = 0
+        signal = "NO_SIGNAL"
 
-    score_buy = 0
-    score_sell = 0
+        # EMA crossover
+        if latest['ema_fast'] > latest['ema_slow']:
+            reasons.append("EMA Bullish Crossover")
+            confidence += 20
+        elif latest['ema_fast'] < latest['ema_slow']:
+            reasons.append("EMA Bearish Crossover")
+            confidence += 20
 
-    # EMA crossover
-    if last['ema_fast'] > last['ema_slow'] and second_last['ema_fast'] <= second_last['ema_slow']:
-        score_buy += 1
-    elif last['ema_fast'] < last['ema_slow'] and second_last['ema_fast'] >= second_last['ema_slow']:
-        score_sell += 1
+        # MACD crossover
+        if latest['macd'] > latest['macd_signal']:
+            reasons.append("MACD Bullish Crossover")
+            confidence += 25
+        elif latest['macd'] < latest['macd_signal']:
+            reasons.append("MACD Bearish Crossover")
+            confidence += 25
 
-    # MACD crossover
-    if last['macd'] > last['macd_signal'] and second_last['macd'] <= second_last['macd_signal']:
-        score_buy += 1
-    elif last['macd'] < last['macd_signal'] and second_last['macd'] >= second_last['macd_signal']:
-        score_sell += 1
+        # RSI filter
+        if latest['rsi'] < 30:
+            reasons.append("RSI Oversold")
+            confidence += 15
+        elif latest['rsi'] > 70:
+            reasons.append("RSI Overbought")
+            confidence += 15
 
-    # RSI zone
-    if last['rsi'] < 30:
-        score_buy += 1
-    elif last['rsi'] > 70:
-        score_sell += 1
+        # Bollinger Band check
+        if latest['close'] < latest['bb_lower']:
+            reasons.append("Price Below Bollinger Band")
+            confidence += 15
+        elif latest['close'] > latest['bb_upper']:
+            reasons.append("Price Above Bollinger Band")
+            confidence += 15
 
-    # Bollinger band signal
-    if last['close'] < last['bb_lower']:
-        score_buy += 1
-    elif last['close'] > last['bb_upper']:
-        score_sell += 1
+        # Final signal decision
+        if confidence >= 50:
+            signal = "BUY" if "Bullish" in " ".join(reasons) or "Oversold" in " ".join(reasons) else "SELL"
 
-    confidence_buy = int((score_buy / 4) * 100)
-    confidence_sell = int((score_sell / 4) * 100)
+        return {
+            "signal": signal,
+            "reason": ", ".join(reasons) if reasons else "No strong signal",
+            "confidence": confidence
+        }
 
-    if score_buy > score_sell:
-        return 'BUY', confidence_buy
-    elif score_sell > score_buy:
-        return 'SELL', confidence_sell
-    else:
-        return None, 0  # No clear signal
-
+    except Exception as e:
+        print(f"Error in analyze_signal: {e}")
+        return {"signal": "NO_SIGNAL", "reason": "Error", "confidence": 0}

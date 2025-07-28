@@ -1,32 +1,20 @@
-# main.py
-
-import time
 import threading
-from pocket_bot import PocketBot
-from telegram_bot import TelegramBot
+from http.server import SimpleHTTPRequestHandler
+from socketserver import TCPServer
+
+from telegram_bot import start_telegram_bot
+from pocket_bot import start_pocket_bot
 from dashboard import run_dashboard
-from signals_utils import validate_signals_loop
+
+def keep_alive():
+    port = 8080
+    handler = SimpleHTTPRequestHandler
+    with TCPServer(("0.0.0.0", port), handler) as httpd:
+        print(f"🟢 Dummy server running at http://0.0.0.0:{port}")
+        httpd.serve_forever()
 
 if __name__ == "__main__":
-    # Initialize components
-    bot = PocketBot()
-    telegram = TelegramBot()
-
-    def signal_loop():
-        while True:
-            signals = bot.generate_signals()
-            if signals:
-                for signal in signals:
-                    telegram.send_signal(signal)
-            time.sleep(60)  # Run every minute
-
-    # Run signal loop in background
-    signal_thread = threading.Thread(target=signal_loop, daemon=True)
-    signal_thread.start()
-
-    # Run validation loop (for signal performance)
-    validation_thread = threading.Thread(target=validate_signals_loop, daemon=True)
-    validation_thread.start()
-
-    # Run Streamlit dashboard
+    threading.Thread(target=keep_alive, daemon=True).start()
+    threading.Thread(target=start_telegram_bot).start()
+    threading.Thread(target=start_pocket_bot).start()
     run_dashboard()

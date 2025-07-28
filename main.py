@@ -1,22 +1,24 @@
 import os
 import threading
-from http.server import SimpleHTTPRequestHandler
-from socketserver import TCPServer
-
-from telegram_bot import start_telegram_bot
 from pocket_bot import start_pocket_bot
-from dashboard import run_dashboard
+from telegram_bot import run_telegram_bot_background
+import subprocess
 
-def keep_alive():
-    port = int(os.environ.get("PORT", 8080))
-    handler = SimpleHTTPRequestHandler
-    with TCPServer(("0.0.0.0", port), handler) as httpd:
-        print(f"🟢 Dummy server running at http://0.0.0.0:{port}")
-        httpd.serve_forever()
+def run_dashboard():
+    subprocess.run([
+        "streamlit", "run", "dashboard.py",
+        "--server.port", "10000",
+        "--server.address", "0.0.0.0"
+    ])
 
 if __name__ == "__main__":
     print("📦 Starting Pocket Option Bot System...")
-    threading.Thread(target=keep_alive, daemon=True).start()
+
+    # ✅ Start pocket bot in background
     threading.Thread(target=start_pocket_bot, daemon=True).start()
-    threading.Thread(target=start_telegram_bot, daemon=True).start()
-    run_dashboard()  # Starts Streamlit via subprocess
+
+    # ✅ Start telegram bot in background WITHOUT updater.idle()
+    threading.Thread(target=run_telegram_bot_background, daemon=True).start()
+
+    # ✅ Start Streamlit dashboard in main thread
+    run_dashboard()

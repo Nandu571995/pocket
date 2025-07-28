@@ -1,66 +1,63 @@
-# File: dashboard.py
+# dashboard.py
 import streamlit as st
-import pandas as pd
 import json
-import os
+import pandas as pd
+from datetime import datetime
 
-SIGNAL_LOG = "signals.json"
+SIGNALS_FILE = "signals.json"
 
 def load_signals():
-    if os.path.exists(SIGNAL_LOG):
-        with open(SIGNAL_LOG, "r") as f:
+    try:
+        with open(SIGNALS_FILE, "r") as f:
             return json.load(f)
-    return []
+    except:
+        return {"1m": [], "3m": [], "5m": [], "10m": []}
 
-def display_signal_table(signals, timeframe):
-    tf_signals = [s for s in signals if s["timeframe"] == timeframe]
-    if not tf_signals:
-        st.warning(f"No signals for {timeframe}")
+def calculate_stats(tf_data):
+    total = len(tf_data)
+    wins = sum(1 for s in tf_data if s["result"] == "WIN")
+    losses = sum(1 for s in tf_data if s["result"] == "LOSS")
+    pending = total - wins - losses
+    accuracy = (wins / total * 100) if total else 0
+    return total, wins, losses, pending, round(accuracy, 2)
+
+def display_tf_tab(tf, tf_data):
+    st.subheader(f"🕒 {tf} Signals")
+
+    if not tf_data:
+        st.info("No signals yet.")
         return
 
-    df = pd.DataFrame(tf_signals)
-    df["time"] = pd.to_datetime(df["timestamp"], unit="s").dt.strftime("%Y-%m-%d %H:%M:%S")
-    df = df[["time", "asset", "signal", "result"]]
-    df = df.rename(columns={
-        "time": "Timestamp",
-        "asset": "Pair",
-        "signal": "Signal",
-        "result": "Outcome"
-    })
+    df = pd.DataFrame(tf_data)
+    df["Timestamp"] = df["time"]
+    df["Pair"] = df["pair"]
+    df["Signal"] = df["direction"]
+    df["Confidence"] = df["confidence"]
+    df["Result"] = df["result"]
+    df = df[["Timestamp", "Pair", "Signal", "Confidence", "Result"]]
 
     st.dataframe(df, use_container_width=True)
 
-    total = len(df)
-    correct = df["Outcome"].str.lower().eq("correct").sum()
-    incorrect = df["Outcome"].str.lower().eq("wrong").sum()
-    accuracy = (correct / total) * 100 if total else 0
+    total, wins, losses, pending, accuracy = calculate_stats(tf_data)
 
-    st.metric(label="📈 Total Signals", value=total)
-    st.metric(label="✅ Correct", value=correct)
-    st.metric(label="❌ Wrong", value=incorrect)
-    st.metric(label="🎯 Accuracy", value=f"{accuracy:.2f} %")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("📈 Total", total)
+    col2.metric("✅ Win", wins)
+    col3.metric("❌ Loss", losses)
+    col4.metric("⏳ Pending", pending)
+    col5.metric("🎯 Accuracy", f"{accuracy:.2f}%")
 
-def run_dashboard():
-    st.set_page_config(page_title="Pocket Option Dashboard", layout="wide")
-    st.title("📊 Pocket Option Signal Dashboard")
-    st.caption("🔄 Live auto-updating signals and accuracy stats for OTC & FX pairs")
+def main():
+    st.set_page_config(page_title="Pocket Option Signal Dashboard", layout="wide")
+    st.title("📊 Real-Time Pocket Option Signal Dashboard")
+    st.caption("Live auto-updating signals for OTC & Currency Pairs - Timeframes: 1m, 3m, 5m, 10m")
 
     signals = load_signals()
 
     tabs = st.tabs(["1m", "3m", "5m", "10m"])
-    timeframes = ["1m", "3m", "5m", "10m"]
-
-    for i, tf in enumerate(timeframes):
+    for i, tf in enumerate(["1m", "3m", "5m", "10m"]):
         with tabs[i]:
-            display_signal_table(signals, tf)
+            display_tf_tab(tf, signals.get(tf, []))
 
-    # Add download button
-    st.sidebar.download_button(
-        "📥 Download Signal Log",
-        data=json.dumps(signals, indent=2),
-        file_name="signals.json"
-    )
-
-# CLI entrypoint for local testing
 if __name__ == "__main__":
-    run_dashboard()
+    main()

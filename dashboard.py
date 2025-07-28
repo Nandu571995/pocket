@@ -77,5 +77,10 @@ def main():
     with perf_tab:
         display_performance(performance)
 
+# ✅ Required by Render to import
+def run_dashboard():
+    main()
+
+# Run directly if executed standalone
 if __name__ == "__main__":
     main()

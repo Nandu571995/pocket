@@ -1,43 +1,40 @@
-# File: pocket_option_scraper.py
+# pocket_option_scraper.py
+
 import requests
+import pandas as pd
 from datetime import datetime, timedelta
+import pytz
 
-def get_active_assets():
+def get_all_assets():
+    url = "https://api.pocketoption.com/en/api/v1/assets/all"
     try:
-        url = "https://pocketoption.com/en/api/v1/assets/"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-
-        active_assets = []
-        for asset in data.get("assets", []):
-            if asset.get("asset_type") == "currency" or asset.get("asset_type") == "otc":
-                if asset.get("is_trading_enabled", False):
-                    active_assets.append(asset["name"])
-        return list(set(active_assets))
+        return [a['symbol'] for a in data if a['is_otc'] or a['type'] == 'forex']
     except Exception as e:
-        print(f"[ERROR] Failed to fetch assets: {e}")
+        print(f"Error fetching assets: {e}")
         return []
 
-def get_candles(asset, tf='1m', count=10):
+def get_candles(symbol, interval='60', limit=100):
+    end = int(datetime.utcnow().timestamp())
+    url = f"https://api.pocketoption.com/en/api/v1/candles/{symbol}?interval={interval}&limit={limit}&end_time={end}"
     try:
-        end = int(datetime.utcnow().timestamp())
-        start = end - count * int(tf.replace('m', '')) * 60
-
-        url = f"https://pocketoption.com/en/api/v1/candles/{asset}?from={start}&to={end}&interval={tf}"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-
-        candles = [{
-            "timestamp": c["timestamp"],
-            "open": c["open"],
-            "high": c["high"],
-            "low": c["low"],
-            "close": c["close"],
-            "volume": c.get("volume", 0)
-        } for c in data.get("candles", [])]
-        return candles
+        candles = [
+            {
+                'time': datetime.utcfromtimestamp(c['timestamp']).replace(tzinfo=pytz.utc),
+                'open': c['open'],
+                'high': c['high'],
+                'low': c['low'],
+                'close': c['close'],
+                'volume': c['volume']
+            }
+            for c in data
+        ]
+        return pd.DataFrame(candles)
     except Exception as e:
-        print(f"[ERROR] Candle fetch failed for {asset}: {e}")
-        return []
+        print(f"Error fetching candles for {symbol}: {e}")
+        return pd.DataFrame()

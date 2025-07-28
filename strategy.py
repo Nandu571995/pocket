@@ -1,65 +1,72 @@
 # strategy.py
 
-import ta
+import pandas as pd
 import numpy as np
+import ta
 
-def compute_indicators(df):
-    df["ema_9"] = ta.trend.ema_indicator(df["close"], window=9)
-    df["ema_21"] = ta.trend.ema_indicator(df["close"], window=21)
-    df["macd"] = ta.trend.macd_diff(df["close"])
-    df["rsi"] = ta.momentum.rsi(df["close"], window=14)
-    bb = ta.volatility.BollingerBands(df["close"], window=20, window_dev=2)
-    df["bb_upper"] = bb.bollinger_hband()
-    df["bb_lower"] = bb.bollinger_lband()
-    df["bb_mid"] = bb.bollinger_mavg()
+def preprocess_data(df):
+    df = df.copy()
+    df['close'] = pd.to_numeric(df['close'], errors='coerce')
+    df['open'] = pd.to_numeric(df['open'], errors='coerce')
+    df['high'] = pd.to_numeric(df['high'], errors='coerce')
+    df['low'] = pd.to_numeric(df['low'], errors='coerce')
+    df.dropna(inplace=True)
     return df
 
-def check_trade_signal(df):
-    df = compute_indicators(df)
+def calculate_indicators(df):
+    df = df.copy()
+    df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=9)
+    df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=21)
+    macd = ta.trend.MACD(df['close'])
+    df['macd'] = macd.macd()
+    df['macd_signal'] = macd.macd_signal()
+    df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
+    bb = ta.volatility.BollingerBands(df['close'], window=20, window_dev=2)
+    df['bb_upper'] = bb.bollinger_hband()
+    df['bb_lower'] = bb.bollinger_lband()
+    return df
+
+def evaluate_signal(df):
+    df = preprocess_data(df)
+    df = calculate_indicators(df)
+
     last = df.iloc[-1]
+    second_last = df.iloc[-2]
 
-    signals = []
+    score_buy = 0
+    score_sell = 0
 
-    # EMA Crossover
-    if last["ema_9"] > last["ema_21"]:
-        signals.append("EMA_BULLISH")
-    elif last["ema_9"] < last["ema_21"]:
-        signals.append("EMA_BEARISH")
+    # EMA crossover
+    if last['ema_fast'] > last['ema_slow'] and second_last['ema_fast'] <= second_last['ema_slow']:
+        score_buy += 1
+    elif last['ema_fast'] < last['ema_slow'] and second_last['ema_fast'] >= second_last['ema_slow']:
+        score_sell += 1
 
-    # MACD
-    if last["macd"] > 0:
-        signals.append("MACD_BULLISH")
-    elif last["macd"] < 0:
-        signals.append("MACD_BEARISH")
+    # MACD crossover
+    if last['macd'] > last['macd_signal'] and second_last['macd'] <= second_last['macd_signal']:
+        score_buy += 1
+    elif last['macd'] < last['macd_signal'] and second_last['macd'] >= second_last['macd_signal']:
+        score_sell += 1
 
-    # RSI
-    if last["rsi"] < 30:
-        signals.append("RSI_OVERSOLD")
-    elif last["rsi"] > 70:
-        signals.append("RSI_OVERBOUGHT")
+    # RSI zone
+    if last['rsi'] < 30:
+        score_buy += 1
+    elif last['rsi'] > 70:
+        score_sell += 1
 
-    # Bollinger Bands
-    if last["close"] < last["bb_lower"]:
-        signals.append("BB_LOWER_BREAK")
-    elif last["close"] > last["bb_upper"]:
-        signals.append("BB_UPPER_BREAK")
+    # Bollinger band signal
+    if last['close'] < last['bb_lower']:
+        score_buy += 1
+    elif last['close'] > last['bb_upper']:
+        score_sell += 1
 
-    # Aggregate signal
-    bullish_count = sum(1 for s in signals if "BULLISH" in s or "OVERSOLD" in s or "LOWER" in s)
-    bearish_count = sum(1 for s in signals if "BEARISH" in s or "OVERBOUGHT" in s or "UPPER" in s)
+    confidence_buy = int((score_buy / 4) * 100)
+    confidence_sell = int((score_sell / 4) * 100)
 
-    if bullish_count > bearish_count:
-        direction = "GREEN"
-        confidence = round((bullish_count / (bullish_count + bearish_count)) * 100, 2)
-    elif bearish_count > bullish_count:
-        direction = "RED"
-        confidence = round((bearish_count / (bullish_count + bearish_count)) * 100, 2)
+    if score_buy > score_sell:
+        return 'BUY', confidence_buy
+    elif score_sell > score_buy:
+        return 'SELL', confidence_sell
     else:
-        direction = None
-        confidence = 0.0
+        return None, 0  # No clear signal
 
-    return {
-        "direction": direction,
-        "confidence": confidence,
-        "reasons": signals
-    }

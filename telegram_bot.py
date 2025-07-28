@@ -2,39 +2,30 @@
 
 import os
 import logging
-from dotenv import load_dotenv
 from telegram import Bot
 
-load_dotenv()
+# Telegram bot credentials
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1014815784")
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def send_signal_to_telegram(signal):
+def send_signal_telegram(signal):
     try:
-        timeframe = signal['timeframe']
-        symbol = signal['symbol']
-        direction = signal['direction']
-        confidence = signal['confidence']
-        reason = signal['reason']
-        signal_time = signal['signal_time']
-        expiry = signal['expiry_time']
-
-        message = f"""
-📡 *New Trading Signal*
-───────────────
-📍 *Asset:* `{symbol}`
-🕒 *Timeframe:* `{timeframe}`
-🟢 *Direction:* `{direction.upper()}`
-📈 *Confidence:* `{confidence}%`
-📚 *Reason:* {reason}
-⏱ *Trade Window:* `{signal_time} – {expiry}`
-───────────────
-🔥 *Execute before candle starts!*
-        """
+        message = (
+            f"📡 *Signal {signal['timeframe']}m | {signal['asset']}*\n"
+            f"🕒 *Time:* {signal['signal_time']}\n"
+            f"🎯 *Direction:* `{signal['direction'].upper()}`\n"
+            f"📊 *Confidence:* {signal['confidence']}%\n"
+            f"📌 *Reason:* {signal['reason']}\n"
+            f"📅 *Generated at:* {signal['generated_at']}\n"
+            f"#PocketOption #SignalBot"
+        )
         bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown')
-        logging.info(f"Signal sent: {symbol} | {timeframe} | {direction}")
+        logger.info(f"Sent signal to Telegram: {message}")
     except Exception as e:
-        logging.error(f"Telegram send error: {e}")
+        logger.error(f"Error sending Telegram message: {e}")

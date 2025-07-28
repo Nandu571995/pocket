@@ -1,7 +1,8 @@
-from telegram import Bot
+from telegram import Bot, Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
 
-# Load from environment variables or directly assign
+# Config
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "1014815784"
 
@@ -21,13 +22,20 @@ def send_signal_telegram(signal):
     )
     bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
 
-# Optional: Telegram test
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("✅ Trading Bot is live and running!")
+
+def start_telegram_bot():
+    """
+    Starts the Telegram bot listener.
+    """
+    updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler("start", start))
+    print("✅ Telegram bot is listening...")
+    updater.start_polling()
+    updater.idle()
+
+# Test manually
 if __name__ == "__main__":
-    send_signal_telegram({
-        "asset": "BTC/USD",
-        "direction": "BUY",
-        "confidence": 87,
-        "reason": "MACD + EMA",
-        "timestamp": "2025-07-28 21:18",
-        "timeframe": "1m"
-    })
+    start_telegram_bot()

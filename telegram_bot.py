@@ -24,3 +24,24 @@ def send_signal_telegram(signal):
     try:
         bot.send_message(chat_id=CHAT_ID, text=msg)
         print(f"✅ Sent to Telegram: {msg}")
+    except Exception as e:
+        print(f"❌ Error sending to Telegram: {e}")
+
+def monitor_signals():
+    last_sent = set()
+    while True:
+        try:
+            with open("signals.json", "r") as f:
+                data = json.load(f)
+                for signal in data:
+                    signal_id = signal.get("id")
+                    if signal_id and signal_id not in last_sent:
+                        send_signal_telegram(signal)
+                        last_sent.add(signal_id)
+        except Exception as e:
+            print("⚠️ Telegram Monitoring Error:", e)
+        time.sleep(10)
+
+def start_telegram_bot():
+    print("📲 Telegram bot started...")
+    threading.Thread(target=monitor_signals).start()

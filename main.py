@@ -15,6 +15,6 @@ def keep_alive():
 
 if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
-    threading.Thread(target=start_telegram_bot).start()
-    threading.Thread(target=start_pocket_bot).start()
-    run_dashboard()
+    threading.Thread(target=start_telegram_bot, daemon=True).start()
+    threading.Thread(target=start_pocket_bot, daemon=True).start()
+    run_dashboard()  # runs Streamlit in the main thread

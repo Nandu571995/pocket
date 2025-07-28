@@ -1,47 +1,32 @@
-# telegram_bot.py
+import os
+from telegram import Bot, ParseMode, Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
-from telegram import Bot
-import threading
-import json
-import time
-from datetime import datetime
+# Set your bot token and chat ID
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1014815784")
 
-TELEGRAM_TOKEN = "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
-CHAT_ID = "1014815784"
+# Initialize bot
+bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
-bot = Bot(token=TELEGRAM_TOKEN)
-
-def send_signal_telegram(signal):
-    msg = (
-        f"📊 Signal #{signal.get('id', 'N/A')}\n"
-        f"📌 Asset: {signal.get('pair')}\n"
-        f"🕒 Timeframe: {signal.get('timeframe')} min\n"
-        f"📈 Direction: {signal.get('direction', '').upper()}\n"
-        f"✅ Confidence: {signal.get('confidence', 0)}%\n"
-        f"📅 Time: {signal.get('timestamp')}\n"
-        f"🧠 Reason: {signal.get('reason')}"
-    )
+def send_signal_telegram(message: str):
+    """Send a message to the Telegram bot."""
     try:
-        bot.send_message(chat_id=CHAT_ID, text=msg)
-        print(f"✅ Sent to Telegram: {msg}")
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
+        print("✅ Telegram alert sent.")
     except Exception as e:
-        print(f"❌ Error sending to Telegram: {e}")
+        print(f"⚠️ Telegram send error: {e}")
 
-def monitor_signals():
-    last_sent = set()
-    while True:
-        try:
-            with open("signals.json", "r") as f:
-                data = json.load(f)
-                for signal in data:
-                    signal_id = signal.get("id")
-                    if signal_id and signal_id not in last_sent:
-                        send_signal_telegram(signal)
-                        last_sent.add(signal_id)
-        except Exception as e:
-            print("⚠️ Telegram Monitoring Error:", e)
-        time.sleep(10)
+# Optional: command to test bot or extend with more controls
+def start(update: Update, context: CallbackContext):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="🤖 Pocket Bot is running!")
 
 def start_telegram_bot():
-    print("📲 Telegram bot started...")
-    threading.Thread(target=monitor_signals).start()
+    try:
+        updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+        dispatcher = updater.dispatcher
+        dispatcher.add_handler(CommandHandler("start", start))
+        updater.start_polling()
+        print("📲 Telegram bot started...")
+    except Exception as e:
+        print(f"⚠️ Telegram Monitoring Error: {e}")

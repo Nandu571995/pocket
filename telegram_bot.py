@@ -25,17 +25,21 @@ def send_signal_telegram(signal):
 def start(update: Update, context: CallbackContext):
     update.message.reply_text("✅ Trading Bot is live and running!")
 
-def start_telegram_bot():
+def run_telegram_bot_background():
     """
-    Starts the Telegram bot listener.
+    Starts the Telegram bot in background thread for Render-safe execution.
     """
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     print("✅ Telegram bot is listening...")
+    updater.start_polling()  # Do NOT call idle() in threads
+
+# Test locally
+if __name__ == "__main__":
+    updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler("start", start))
+    print("✅ Telegram bot is running locally...")
     updater.start_polling()
     updater.idle()
-
-# Test manually
-if __name__ == "__main__":
-    start_telegram_bot()

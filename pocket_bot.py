@@ -1,89 +1,62 @@
-# pocket_bot.py
-
-import requests
-import pandas as pd
+# File: pocket_bot.py
 import time
 import json
 from datetime import datetime, timedelta
-from strategy import evaluate_signal
+from strategy import check_trade_signal
+from telegram_bot import send_signal
+from pocket_option_scraper import get_active_assets, get_candles
 
-# Assets to scan (OTC + Forex Pairs)
-ASSETS = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "NZDUSD",
-    "EURJPY", "GBPJPY", "EURGBP", "USDCAD",
-    "OTC_EURUSD", "OTC_GBPUSD", "OTC_USDJPY", "OTC_AUDUSD"
-]
-
-TIMEFRAMES = {
-    "1m": 1,
-    "3m": 3,
-    "5m": 5,
-    "10m": 10
-}
-
-SIGNAL_FILE = "signals.json"
-
-# Pocket Option candle data URL (replace this with actual URL or scraping logic)
-def get_candle_data(symbol, minutes=50, timeframe="1m"):
-    url = f"https://pocketapi.in/get_candles?pair={symbol}&interval={timeframe}&limit={minutes}"
-    try:
-        res = requests.get(url)
-        data = res.json()
-        candles = pd.DataFrame(data)
-        candles.columns = ['timestamp', 'open', 'high', 'low', 'close']
-        candles['timestamp'] = pd.to_datetime(candles['timestamp'], unit='s')
-        return candles
-    except Exception as e:
-        print(f"Error fetching data for {symbol} - {e}")
-        return None
-
-def generate_and_save_signal(symbol, tf_name):
-    df = get_candle_data(symbol, minutes=50, timeframe=tf_name)
-    if df is None or len(df) < 30:
-        return None
-
-    signal, confidence = evaluate_signal(df)
-    if signal:
-        now = datetime.utcnow() + timedelta(minutes=5.5*60)  # convert to IST
-        start_time = (now + timedelta(minutes=1)).strftime("%H:%M")
-        end_time = (now + timedelta(minutes=1+TIMEFRAMES[tf_name])).strftime("%H:%M")
-        msg = f"""
-📡 Signal #{tf_name}
-Asset: {symbol}
-🕒 Time: {start_time}–{end_time}
-📊 Action: {signal}
-✅ Confidence: {confidence}%
-        """.strip()
-
-        log = {
-            "symbol": symbol,
-            "timeframe": tf_name,
-            "start": start_time,
-            "end": end_time,
-            "signal": signal,
-            "confidence": confidence,
-            "timestamp": now.strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-        try:
-            with open(SIGNAL_FILE, 'r') as f:
-                old_data = json.load(f)
-        except:
-            old_data = []
-
-        old_data.append(log)
-        with open(SIGNAL_FILE, 'w') as f:
-            json.dump(old_data, f, indent=2)
-
-        print(msg)
-        return msg
-    return None
+TIMEFRAMES = ['1m', '3m', '5m', '10m']
 
 def start_pocket_bot():
-    print("🔁 Pocket Option bot started...")
+    print("📊 Starting real-time Pocket Option bot...")
     while True:
-        for tf_name in TIMEFRAMES:
-            for symbol in ASSETS:
-                signal = generate_and_save_signal(symbol, tf_name)
-                time.sleep(1)  # avoid rate limits
-        time.sleep(30)
+        try:
+            assets = get_active_assets()
+            print(f"🔍 Scanning {len(assets)} assets...")
+
+            for asset in assets:
+                for tf in TIMEFRAMES:
+                    candles = get_candles(asset, tf)
+                    if not candles or len(candles) < 5:
+                        continue
+
+                    signal_data = check_trade_signal(candles)
+                    if signal_data:
+                        direction, confidence, reason = signal_data["signal"], signal_data["confidence"], signal_data["reason"]
+
+                        next_start = (datetime.utcnow() + timedelta(seconds=30)).strftime('%H:%M')
+                        next_end = (datetime.utcnow() + timedelta(minutes=int(tf.replace('m', '')))).strftime('%H:%M')
+
+                        send_signal(asset, tf, direction, confidence, reason, next_start, next_end)
+                        log_signal(asset, tf, direction, confidence, reason, next_start, next_end)
+
+            time.sleep(30)
+        except Exception as e:
+            print(f"[ERROR] Bot loop: {e}")
+            time.sleep(10)
+
+def log_signal(asset, tf, direction, confidence, reason, start, end):
+    try:
+        with open("signals.json", "r") as f:
+            data = json.load(f)
+    except:
+        data = {}
+
+    if tf not in data:
+        data[tf] = []
+
+    signal_entry = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "asset": asset,
+        "direction": direction,
+        "confidence": confidence,
+        "reason": reason,
+        "range": f"{start}-{end}",
+        "result": "PENDING"
+    }
+
+    data[tf].append(signal_entry)
+
+    with open("signals.json", "w") as f:
+        json.dump(data, f, indent=4)

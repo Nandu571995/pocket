@@ -1,70 +1,106 @@
 # pocket_bot.py
-import time
+
 import json
-import random
+import time
+import pytz
 import threading
-from datetime import datetime, timedelta
-from strategy import generate_signal
-from telegram_bot import send_telegram_signal
+import datetime
+import requests
+from strategy import check_trade_signal
+from telegram_bot import send_signal_message
 
-SIGNALS_FILE = "signals.json"
-TIMEFRAMES = ["1m", "3m", "5m", "10m"]
+TIMEFRAMES = {
+    "1m": 60,
+    "3m": 180,
+    "5m": 300,
+    "10m": 600
+}
 
-# Simulated list of OTC and FX assets for Pocket Option
-ASSETS = [
-    "EUR/USD", "GBP/USD", "AUD/USD", "USD/JPY", "USD/CHF", "USD/CAD",
-    "EUR/GBP", "EUR/JPY", "BTC/USD", "ETH/USD",
-    "OTC EUR/USD", "OTC GBP/JPY", "OTC AUD/CAD", "OTC USD/CHF", "OTC NZD/JPY"
+PAIRS = [
+    "EURUSD-OTC", "GBPUSD-OTC", "USDJPY-OTC", "AUDUSD-OTC", "EURJPY-OTC",
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURJPY"
 ]
 
-def load_existing_signals():
+def fetch_candles(pair, interval, limit=100):
     try:
-        with open(SIGNALS_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        url = f"https://api.pocketoption.com/api/v1/candles/{pair}?interval={interval}&limit={limit}"
+        response = requests.get(url)
+        data = response.json()
+        candles = [{"time": c["timestamp"], "open": c["open"], "high": c["high"],
+                    "low": c["low"], "close": c["close"], "volume": c["volume"]}
+                   for c in data["data"]]
+        return candles
+    except Exception as e:
+        print(f"Error fetching candles for {pair} [{interval}]:", e)
         return []
 
-def save_signal(signal):
-    signals = load_existing_signals()
-    signals.append(signal)
-    with open(SIGNALS_FILE, "w") as f:
+def load_signal_log():
+    try:
+        with open("signals.json", "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_signal_log(signals):
+    with open("signals.json", "w") as f:
         json.dump(signals, f, indent=2)
 
-def signal_loop(asset, tf):
+def should_generate(pair, tf, log):
+    now = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+    next_candle = now + datetime.timedelta(seconds=TIMEFRAMES[tf])
+    timestamp = next_candle.strftime("%Y-%m-%d %H:%M:%S")
+    for s in log:
+        if s["pair"] == pair and s["timeframe"] == tf and s["next_candle"] == timestamp:
+            return False
+    return True
+
+def analyze_and_signal(pair, tf):
+    interval = tf.replace("m", "")
+    candles = fetch_candles(pair, interval)
+    if len(candles) < 30:
+        return
+
+    signal = check_trade_signal(candles)
+    if signal["direction"] is None or signal["confidence"] < 60:
+        return
+
+    log = load_signal_log()
+    if not should_generate(pair, tf, log):
+        return
+
+    next_candle_time = datetime.datetime.utcnow().replace(second=0, microsecond=0) + datetime.timedelta(seconds=TIMEFRAMES[tf])
+    next_str = next_candle_time.strftime("%H:%M") + "–" + (next_candle_time + datetime.timedelta(minutes=1)).strftime("%H:%M")
+
+    signal_data = {
+        "pair": pair,
+        "timeframe": tf,
+        "direction": signal["direction"],
+        "confidence": signal["confidence"],
+        "reasons": signal["reasons"],
+        "next_candle": next_candle_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "time_generated": datetime.datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    log.append(signal_data)
+    save_signal_log(log)
+
+    msg = f"""📊 *Signal Alert*
+Asset: `{pair}`
+Timeframe: `{tf}`
+🕰 Time: `{next_str}`
+📈 Direction: *{signal['direction']}*
+✅ Confidence: *{signal['confidence']}%*
+📚 Reason: `{', '.join(signal['reasons'])}`"""
+    send_signal_message(msg)
+
+def scan_all():
     while True:
-        now = datetime.utcnow()
-        current_minute = now.minute
-        current_second = now.second
-
-        # Calculate when to send the signal (30–60 seconds before next candle)
-        delay = 60 - current_second - 30
-        if delay > 0:
-            time.sleep(delay)
-
-        signal_data = generate_signal(asset, tf)
-
-        if signal_data and signal_data["confidence"] >= 60:
-            signal = {
-                "timestamp": int(time.time()),
-                "pair": asset,
-                "timeframe": tf,
-                "signal": signal_data["direction"],
-                "confidence": signal_data["confidence"],
-                "result": "pending"
-            }
-            save_signal(signal)
-
-            formatted_time = (datetime.utcnow() + timedelta(minutes=1)).strftime("%H:%M")
-            message = (
-                f"📡 *Next Candle {tf.upper()}*\n"
-                f"*{signal['signal'].upper()}* | `{asset}` | ⏰ {formatted_time}\n"
-                f"🎯 Confidence: *{signal['confidence']}%*"
-            )
-            send_telegram_signal(message)
-
+        print("⏳ Scanning...")
+        for tf in TIMEFRAMES:
+            for pair in PAIRS:
+                threading.Thread(target=analyze_and_signal, args=(pair, tf)).start()
         time.sleep(30)
 
 def start_pocket_bot():
-    for asset in ASSETS:
-        for tf in TIMEFRAMES:
-            threading.Thread(target=signal_loop, args=(asset, tf), daemon=True).start()
+    t = threading.Thread(target=scan_all)
+    t.start()

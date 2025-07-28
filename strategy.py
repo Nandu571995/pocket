@@ -1,41 +1,57 @@
-# File: strategy.py
+# strategy.py
+from ta.trend import EMAIndicator, MACD
+from ta.momentum import RSIIndicator
+from ta.volatility import BollingerBands
 import pandas as pd
-import ta
 
-def get_indicators(df):
-    df['ema_fast'] = ta.trend.ema_indicator(df['close'], window=5)
-    df['ema_slow'] = ta.trend.ema_indicator(df['close'], window=20)
-    df['macd'] = ta.trend.macd_diff(df['close'])
-    df['rsi'] = ta.momentum.rsi(df['close'])
-    return df
-
-def check_trade_signal(candles):
-    # Ensure input is a DataFrame
-    if not isinstance(candles, pd.DataFrame):
-        df = pd.DataFrame(candles)
-    else:
-        df = candles
-
-    if df.empty or len(df) < 25:
+def check_trade_signal(candles, timeframe):
+    if len(candles) < 50:
         return None
 
-    df = get_indicators(df)
+    df = pd.DataFrame(candles)
+    df.columns = ["timestamp", "open", "high", "low", "close"]
+    df["close"] = df["close"].astype(float)
+
+    macd = MACD(close=df["close"])
+    ema = EMAIndicator(close=df["close"], window=21)
+    rsi = RSIIndicator(close=df["close"], window=14)
+    bb = BollingerBands(close=df["close"], window=20)
+
+    df["macd"] = macd.macd()
+    df["signal"] = macd.macd_signal()
+    df["ema"] = ema.ema_indicator()
+    df["rsi"] = rsi.rsi()
+    df["bb_upper"] = bb.bollinger_hband()
+    df["bb_lower"] = bb.bollinger_lband()
+
     latest = df.iloc[-1]
 
-    if (latest['ema_fast'] > latest['ema_slow'] and 
-        latest['macd'] > 0 and 
-        latest['rsi'] > 55):
-        return {
-            "direction": "BUY",
-            "reason": "EMA fast > slow, MACD > 0, RSI > 55"
-        }
+    signal = None
+    confidence = 0
 
-    elif (latest['ema_fast'] < latest['ema_slow'] and 
-          latest['macd'] < 0 and 
-          latest['rsi'] < 45):
-        return {
-            "direction": "SELL",
-            "reason": "EMA fast < slow, MACD < 0, RSI < 45"
-        }
+    if (
+        latest["macd"] > latest["signal"] and
+        latest["close"] > latest["ema"] and
+        latest["rsi"] > 50 and
+        latest["close"] < latest["bb_upper"]
+    ):
+        signal = "GREEN"
+        confidence += 25
+    if (
+        latest["macd"] < latest["signal"] and
+        latest["close"] < latest["ema"] and
+        latest["rsi"] < 50 and
+        latest["close"] > latest["bb_lower"]
+    ):
+        signal = "RED"
+        confidence += 25
 
-    return None
+    if signal:
+        if 55 <= latest["rsi"] <= 70 or 30 <= latest["rsi"] <= 45:
+            confidence += 25
+        if abs(latest["macd"] - latest["signal"]) > 0.1:
+            confidence += 25
+
+        confidence = min(100, confidence)
+
+    return {"signal": signal, "confidence": confidence} if signal else None

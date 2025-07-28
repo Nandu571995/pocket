@@ -1,79 +1,67 @@
 # pocket_bot.py
 
-import time
-import json
 import threading
+import time
 from datetime import datetime, timedelta
 from pocket_option_scraper import get_all_assets, get_candles
 from strategy import analyze_signal
-from telegram_bot import send_signal_alert
+from telegram_bot import send_signal_telegram
+import json
+import os
 
 SIGNALS_FILE = "signals.json"
-TIMEFRAMES = {
-    '1m': 60,
-    '3m': 180,
-    '5m': 300,
-    '10m': 600
-}
+TIMEFRAMES = [1, 3, 5, 10]
 
-def load_existing_signals():
-    try:
-        with open(SIGNALS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_signal(signal):
-    all_signals = load_existing_signals()
-    all_signals.append(signal)
+# Ensure signals.json exists
+if not os.path.exists(SIGNALS_FILE):
     with open(SIGNALS_FILE, "w") as f:
-        json.dump(all_signals[-500:], f, indent=2, default=str)  # keep last 500 only
+        json.dump([], f)
 
-def process_asset(symbol, timeframe, interval):
-    candles = get_candles(symbol, str(interval), limit=100)
-    if candles.empty or len(candles) < 50:
-        return
+def log_signal(signal):
+    with open(SIGNALS_FILE, "r+") as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            data = []
+        data.append(signal)
+        f.seek(0)
+        json.dump(data, f, indent=4)
+        f.truncate()
 
-    signal_data = analyze_signal(candles)
-    if signal_data["signal"] == "NO_SIGNAL":
-        return
-
-    # Set signal timing
-    now = datetime.utcnow()
-    next_candle_time = (now + timedelta(seconds=interval)).replace(second=0, microsecond=0)
-    alert_time = next_candle_time - timedelta(seconds=60)
-
-    # Prepare signal
-    signal = {
-        "pair": symbol,
-        "timeframe": timeframe,
-        "signal": signal_data["signal"],
-        "reason": signal_data["reason"],
-        "confidence": signal_data["confidence"],
-        "timestamp": datetime.utcnow().isoformat(),
-        "for_candle": f"{next_candle_time.strftime('%H:%M')}–{(next_candle_time + timedelta(seconds=interval)).strftime('%H:%M')}"
-    }
-
-    print(f"[{timeframe}] Signal for {symbol}: {signal['signal']} @ {signal['for_candle']} | {signal['confidence']}%")
-
-    # Save and send signal
-    save_signal(signal)
-    send_signal_alert(signal)
-
-def scan_market():
-    assets = get_all_assets()
-    for symbol in assets:
-        for tf, interval in TIMEFRAMES.items():
-            try:
-                process_asset(symbol, tf, interval)
-            except Exception as e:
-                print(f"Error on {symbol}-{tf}: {e}")
+def process_asset(asset):
+    for tf in TIMEFRAMES:
+        candles = get_candles(asset, interval=tf, limit=30)
+        if len(candles) < 20:
+            return
+        signal_info = analyze_signal(candles)
+        if signal_info:
+            now = datetime.utcnow()
+            signal_time = now + timedelta(minutes=1)
+            signal = {
+                "id": f"{asset}_{tf}_{signal_time.strftime('%Y%m%d%H%M')}",
+                "asset": asset,
+                "timeframe": tf,
+                "signal_time": f"{(signal_time).strftime('%H:%M')}–{(signal_time + timedelta(minutes=tf)).strftime('%H:%M')}",
+                "direction": signal_info["direction"],
+                "confidence": signal_info["confidence"],
+                "reason": signal_info["reason"],
+                "generated_at": now.strftime('%Y-%m-%d %H:%M:%S'),
+                "status": "pending"
+            }
+            log_signal(signal)
+            send_signal_telegram(signal)
 
 def start_pocket_bot():
-    print("✅ Pocket Option Bot Started.")
-    while True:
-        now = datetime.utcnow()
-        if now.second == 0:
-            threading.Thread(target=scan_market).start()
-            time.sleep(55)
-        time.sleep(1)
+    print("✅ Pocket bot started.")
+    def run_loop():
+        while True:
+            try:
+                all_assets = get_all_assets()
+                for asset in all_assets:
+                    process_asset(asset)
+                time.sleep(60)
+            except Exception as e:
+                print(f"Error in bot loop: {e}")
+                time.sleep(10)
+
+    threading.Thread(target=run_loop).start()

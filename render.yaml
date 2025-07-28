@@ -1,12 +1,7 @@
 services:
   - type: web
-    name: pocket-option-bot
+    name: pocket-dashboard
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: streamlit run dashboard.py --server.port 8080 --server.address 0.0.0.0
-    envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        value: 8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA
-      - key: TELEGRAM_CHAT_ID
-        value: 1014815784

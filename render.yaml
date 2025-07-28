@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: pocket-bot
+    name: pocket-dashboard
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: streamlit run dashboard.py --server.port=$PORT
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         value: your-bot-token-here

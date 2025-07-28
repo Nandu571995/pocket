@@ -17,4 +17,6 @@ if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=start_telegram_bot, daemon=True).start()
     threading.Thread(target=start_pocket_bot, daemon=True).start()
-    # ❌ Removed run_dashboard()
+    # DO NOT RUN Streamlit here
+    while True:
+        pass  # keep process alive

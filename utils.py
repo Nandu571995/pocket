@@ -1,10 +1,12 @@
-from pocket_option_scraper import get_candle_data  # Or your custom scraper function
+from pocket_option_scraper import fetch_candles_for_all_assets
 
 def get_latest_candle(pair, time_str):
     """
     Find the 1-minute candle for a given pair and HH:MM time.
     """
-    candles = get_candle_data(pair, interval="1m", limit=10)
+    # Fetch data for just this asset and 1m timeframe
+    candles_data = fetch_candles_for_all_assets([1])  # 1 = 1m
+    candles = candles_data.get(pair, {}).get(1, [])  # 1 = 1m
 
     for candle in candles:
         candle_time = candle["time"][-5:]  # Extract HH:MM from timestamp

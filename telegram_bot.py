@@ -1,10 +1,12 @@
+# telegram_bot.py
+
 from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
 
-# Config
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "YOUR_REAL_TOKEN"
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "YOUR_REAL_CHAT_ID"
+# Environment variables or fallback
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or "8062898551:AAFp6Mzz3TU2Ngeqf4gL4KL55S1guuRwcnA"
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or "1014815784"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -20,22 +22,13 @@ def send_signal_telegram(signal):
     bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
 
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("✅ Trading Bot is live and running!")
+    update.message.reply_text("✅ Trading Bot is live!")
 
 def run_telegram_bot_background():
-    """
-    For Render or background thread: polling without idle() to prevent blocking or error
-    """
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
-    print("✅ Telegram bot is listening...")
-    updater.start_polling()  # No .idle()
 
-# For manual local testing
-if __name__ == "__main__":
-    updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
+    print("✅ Telegram listener started in background...")
     updater.start_polling()
-    updater.idle()
+    # DO NOT CALL `updater.idle()` here or it will block everything
